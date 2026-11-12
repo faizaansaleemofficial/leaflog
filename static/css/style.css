@@ -1,0 +1,16 @@
+* { box-sizing: border-box; }
+body { font-family: system-ui, sans-serif; margin: 0; background: #f3f8f2; color: #1f2d1f; }
+nav { display: flex; justify-content: space-between; align-items: center;
+      padding: 1rem 2rem; background: #2e7d32; color: white; }
+nav a { color: white; text-decoration: none; margin-left: 1rem; }
+.brand { font-weight: bold; font-size: 1.2rem; margin-left: 0; }
+main { max-width: 720px; margin: 2rem auto; padding: 0 1rem; }
+.card { background: white; padding: 1.5rem; border-radius: 10px;
+        box-shadow: 0 2px 8px rgba(0,0,0,.08); display: flex; flex-direction: column; gap: .5rem; }
+input, textarea { padding: .6rem; border: 1px solid #ccd; border-radius: 6px; font-size: 1rem; }
+button { padding: .7rem; background: #2e7d32; color: white; border: 0;
+         border-radius: 6px; font-size: 1rem; cursor: pointer; margin-top: .5rem; }
+button:hover { background: #1b5e20; }
+.flash { padding: .8rem 1rem; border-radius: 6px; margin-bottom: 1rem; }
+.flash.error { background: #fdecea; color: #b71c1c; }
+.flash.success { background: #e8f5e9; color: #1b5e20; }

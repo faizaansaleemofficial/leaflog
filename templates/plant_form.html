@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}{{ "Edit plant" if mode == "edit" else "Add plant" }} · LeafLog{% endblock %}
+{% block content %}
+<h1>{{ "Edit plant" if mode == "edit" else "Add a plant" }}</h1>
+
+<form method="POST" class="card">
+  <label for="name">Plant name *</label>
+  <input type="text" id="name" name="name" required maxlength="60"
+         value="{{ plant.get('name', '') }}">
+
+  <label for="species">Species (optional)</label>
+  <input type="text" id="species" name="species" maxlength="80"
+         value="{{ plant.get('species') or '' }}">
+
+  <label for="location">Location (optional)</label>
+  <input type="text" id="location" name="location" maxlength="80"
+         placeholder="e.g. Living room window"
+         value="{{ plant.get('location') or '' }}">
+
+  <label for="watering_interval_days">Water every (days) *</label>
+  <input type="number" id="watering_interval_days" name="watering_interval_days"
+         required min="1" max="365"
+         value="{{ plant.get('watering_interval_days', 7) }}">
+
+  <label for="notes">Notes (optional)</label>
+  <textarea id="notes" name="notes" rows="4" maxlength="500">{{ plant.get('notes') or '' }}</textarea>
+
+  <button type="submit">{{ "Save changes" if mode == "edit" else "Add plant" }}</button>
+</form>
+
+<p><a href="{{ url_for('dashboard') }}">← Back to my plants</a></p>
+{% endblock %}

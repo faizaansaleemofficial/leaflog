@@ -1,6 +1,43 @@
 {% extends "base.html" %}
 {% block title %}My Plants · LeafLog{% endblock %}
 {% block content %}
-<h1>My Plants</h1>
-<p>Your plants will appear here soon.</p>
+<div class="page-head">
+  <h1>My Plants</h1>
+  <a href="{{ url_for('add_plant') }}" class="btn">+ Add plant</a>
+</div>
+
+{% if plants %}
+<div class="plant-grid">
+  {% for plant in plants %}
+  <article class="plant-card">
+    <h2>{{ plant.name }}</h2>
+    {% if plant.species %}<p class="species">{{ plant.species }}</p>{% endif %}
+    <p>📍 {{ plant.location or "No location set" }}</p>
+    <p>💧 Water every {{ plant.watering_interval_days }} days</p>
+    {% if plant.notes %}<p class="notes">{{ plant.notes }}</p>{% endif %}
+    <div class="card-actions">
+      <a href="{{ url_for('edit_plant', plant_id=plant.id) }}" class="btn small">Edit</a>
+      <form method="POST" action="{{ url_for('delete_plant', plant_id=plant.id) }}" class="delete-form">
+        <button type="submit" class="small danger">Delete</button>
+      </form>
+    </div>
+  </article>
+  {% endfor %}
+</div>
+{% else %}
+<div class="card empty">
+  <p>You haven't added any plants yet.</p>
+  <a href="{{ url_for('add_plant') }}" class="btn">Add your first plant</a>
+</div>
+{% endif %}
+
+<script>
+document.querySelectorAll(".delete-form").forEach(function (form) {
+  form.addEventListener("submit", function (e) {
+    if (!confirm("Delete this plant? This cannot be undone.")) {
+      e.preventDefault();
+    }
+  });
+});
+</script>
 {% endblock %}

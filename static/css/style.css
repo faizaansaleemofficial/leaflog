@@ -14,3 +14,21 @@ button:hover { background: #1b5e20; }
 .flash { padding: .8rem 1rem; border-radius: 6px; margin-bottom: 1rem; }
 .flash.error { background: #fdecea; color: #b71c1c; }
 .flash.success { background: #e8f5e9; color: #1b5e20; }
+.page-head { display: flex; justify-content: space-between; align-items: center; }
+.btn { display: inline-block; padding: .6rem 1rem; background: #2e7d32; color: white;
+       border-radius: 6px; text-decoration: none; }
+.btn:hover { background: #1b5e20; }
+.btn.small, button.small { padding: .4rem .8rem; font-size: .9rem; margin-top: 0; }
+button.danger { background: #c62828; }
+button.danger:hover { background: #8e0000; }
+.plant-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 1rem; }
+.plant-card { background: white; padding: 1rem; border-radius: 10px;
+              box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+.plant-card h2 { margin: 0 0 .3rem; }
+.species { color: #666; font-style: italic; margin-top: 0; }
+.notes { font-size: .9rem; color: #444; }
+.card-actions { display: flex; gap: .5rem; margin-top: .8rem; align-items: center; }
+.delete-form { margin: 0; }
+.empty { text-align: center; align-items: center; }
+textarea { padding: .6rem; border: 1px solid #ccd; border-radius: 6px;
+           font-size: 1rem; font-family: inherit; }

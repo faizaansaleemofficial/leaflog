@@ -3,7 +3,7 @@
 {% block content %}
 <h1>{{ "Edit plant" if mode == "edit" else "Add a plant" }}</h1>
 
-<form method="POST" class="card">
+<form method="POST" enctype="multipart/form-data" class="card">
   <label for="name">Plant name *</label>
   <input type="text" id="name" name="name" required maxlength="60"
          value="{{ plant.get('name', '') }}">
@@ -22,6 +22,14 @@
          required min="1" max="365"
          value="{{ plant.get('watering_interval_days', 7) }}">
 
+  <label for="photo">Photo (optional, PNG/JPG/WebP, max 3 MB)</label>
+  {% if plant.get('photo_url') %}
+    <img src="{{ plant.get('photo_url') }}" alt="Current photo" class="photo-preview" id="current-photo">
+    <small>Choose a new file below to replace it.</small>
+  {% endif %}
+  <input type="file" id="photo" name="photo" accept="image/png,image/jpeg,image/webp">
+  <img id="preview" class="photo-preview" alt="Photo preview" hidden>
+
   <label for="notes">Notes (optional)</label>
   <textarea id="notes" name="notes" rows="4" maxlength="500">{{ plant.get('notes') or '' }}</textarea>
 
@@ -29,4 +37,20 @@
 </form>
 
 <p><a href="{{ url_for('dashboard') }}">← Back to my plants</a></p>
+
+<script>
+document.getElementById("photo").addEventListener("change", function () {
+  var file = this.files[0];
+  var preview = document.getElementById("preview");
+  var current = document.getElementById("current-photo");
+  if (file) {
+    preview.src = URL.createObjectURL(file);
+    preview.hidden = false;
+    if (current) { current.hidden = true; }
+  } else {
+    preview.hidden = true;
+    if (current) { current.hidden = false; }
+  }
+});
+</script>
 {% endblock %}

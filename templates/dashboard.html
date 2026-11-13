@@ -32,6 +32,9 @@
 <div class="plant-grid">
   {% for plant in plants %}
   <article class="plant-card">
+    {% if plant.photo_url %}
+      <img src="{{ plant.photo_url }}" alt="Photo of {{ plant.name }}" class="plant-photo" loading="lazy">
+    {% endif %}
     <h2><a href="{{ url_for('plant_detail', plant_id=plant.id) }}">{{ plant.name }}</a></h2>
     {% if plant.species %}<p class="species">{{ plant.species }}</p>{% endif %}
     <p>📍 {{ plant.location or "No location set" }}</p>

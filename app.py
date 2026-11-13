@@ -1,6 +1,7 @@
 import json
 import os
 import re
+import uuid
 from datetime import datetime, timedelta, timezone
 from functools import wraps
 from urllib.parse import urlencode
@@ -15,10 +16,14 @@ load_dotenv()
 
 app = Flask(__name__, static_folder="public", static_url_path="")
 app.secret_key = os.environ["SECRET_KEY"]
+app.config["MAX_CONTENT_LENGTH"] = 4 * 1024 * 1024  # reject requests over 4 MB
 
 SUPABASE_URL = os.environ["SUPABASE_URL"].strip().strip("'\"")
 SUPABASE_KEY = os.environ["SUPABASE_KEY"].strip().strip("'\"")
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+
+PHOTO_BUCKET = "plant-photos"
+MAX_PHOTO_BYTES = 3 * 1024 * 1024
 
 
 def login_required(view):
@@ -30,6 +35,12 @@ def login_required(view):
             return redirect(url_for("login"))
         return view(*args, **kwargs)
     return wrapped
+
+
+@app.errorhandler(413)
+def file_too_large(e):
+    flash("That upload is too large. Photos must be under 3 MB.", "error")
+    return redirect(url_for("dashboard"))
 
 
 # ---------- Auth ----------
@@ -196,6 +207,57 @@ def set_city():
     return redirect(url_for("dashboard"))
 
 
+# ---------- Photo uploads (Supabase Storage) ----------
+
+def detect_image_type(data):
+    """Check the file's real contents, not just its name."""
+    if data.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "png", "image/png"
+    if data.startswith(b"\xff\xd8\xff"):
+        return "jpg", "image/jpeg"
+    if data[:4] == b"RIFF" and data[8:12] == b"WEBP":
+        return "webp", "image/webp"
+    return None, None
+
+
+def save_photo(file):
+    """Upload a photo. Returns (public_url, error). (None, None) if no file was chosen."""
+    if not file or not file.filename:
+        return None, None
+
+    data = file.read()
+    if len(data) > MAX_PHOTO_BYTES:
+        return None, "Photo must be smaller than 3 MB."
+
+    ext, mimetype = detect_image_type(data)
+    if not ext:
+        return None, "Photo must be a PNG, JPG or WebP image."
+
+    # Random file name, so users can't overwrite each other's files
+    path = f"{session['user_id']}/{uuid.uuid4().hex}.{ext}"
+    try:
+        supabase.storage.from_(PHOTO_BUCKET).upload(path, data, {"content-type": mimetype})
+    except Exception as e:
+        print("Photo upload error:", e)
+        return None, "Photo upload failed. Please try again."
+
+    return supabase.storage.from_(PHOTO_BUCKET).get_public_url(path), None
+
+
+def delete_photo(url):
+    """Remove a stored photo (best effort)."""
+    if not url:
+        return
+    marker = "/object/public/" + PHOTO_BUCKET + "/"
+    if marker not in url:
+        return
+    path = url.split(marker, 1)[1].split("?")[0]
+    try:
+        supabase.storage.from_(PHOTO_BUCKET).remove([path])
+    except Exception as e:
+        print("Photo delete error:", e)
+
+
 # ---------- Plants (CRUD) ----------
 
 def read_plant_form():
@@ -284,11 +346,16 @@ def dashboard():
 def add_plant():
     if request.method == "POST":
         data, error = read_plant_form()
+        photo_url = None
+        if not error:
+            photo_url, error = save_photo(request.files.get("photo"))
         if error:
             flash(error, "error")
             return render_template("plant_form.html", plant=request.form, mode="add")
 
         data["user_id"] = session["user_id"]
+        if photo_url:
+            data["photo_url"] = photo_url
         supabase.table("plants").insert(data).execute()
         flash("Plant added!", "success")
         return redirect(url_for("dashboard"))
@@ -306,9 +373,16 @@ def edit_plant(plant_id):
 
     if request.method == "POST":
         data, error = read_plant_form()
+        photo_url = None
+        if not error:
+            photo_url, error = save_photo(request.files.get("photo"))
         if error:
             flash(error, "error")
             return render_template("plant_form.html", plant=request.form, mode="edit")
+
+        if photo_url:
+            delete_photo(plant.get("photo_url"))  # remove the old picture
+            data["photo_url"] = photo_url
 
         (supabase.table("plants").update(data)
          .eq("id", plant_id)
@@ -323,11 +397,16 @@ def edit_plant(plant_id):
 @app.route("/plants/<int:plant_id>/delete", methods=["POST"])
 @login_required
 def delete_plant(plant_id):
-    (supabase.table("plants").delete()
-     .eq("id", plant_id)
-     .eq("user_id", session["user_id"])
-     .execute())
-    flash("Plant deleted.", "success")
+    plant = get_own_plant(plant_id)
+    if plant:
+        delete_photo(plant.get("photo_url"))
+        (supabase.table("plants").delete()
+         .eq("id", plant_id)
+         .eq("user_id", session["user_id"])
+         .execute())
+        flash("Plant deleted.", "success")
+    else:
+        flash("Plant not found.", "error")
     return redirect(url_for("dashboard"))
 
 

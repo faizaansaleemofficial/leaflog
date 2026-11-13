@@ -6,6 +6,28 @@
   <a href="{{ url_for('add_plant') }}" class="btn">+ Add plant</a>
 </div>
 
+<section class="weather-card">
+  {% if city and weather and not weather.error %}
+    <h2>🌤️ Weather in {{ city }}</h2>
+    <p class="weather-stats">
+      Now {{ weather.temp_now }}°C · Today's high {{ weather.max_today }}°C ·
+      Rain today {{ weather.rain_today }} mm
+    </p>
+    <p class="weather-advice">{{ weather.advice }}</p>
+  {% elif city %}
+    <h2>🌤️ Weather in {{ city }}</h2>
+    <p>The forecast is unavailable right now. Please try again in a minute.</p>
+  {% else %}
+    <h2>🌤️ Get watering advice from the weather</h2>
+    <p>Set your city to see whether rain is coming.</p>
+  {% endif %}
+  <form method="POST" action="{{ url_for('set_city') }}" class="city-form">
+    <label for="city" class="sr-only">City</label>
+    <input type="text" id="city" name="city" required maxlength="60" placeholder="Enter your city">
+    <button type="submit" class="small">{{ "Change city" if city else "Set city" }}</button>
+  </form>
+</section>
+
 {% if plants %}
 <div class="plant-grid">
   {% for plant in plants %}

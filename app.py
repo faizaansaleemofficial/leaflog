@@ -1,7 +1,10 @@
+import json
 import os
 import re
 from datetime import datetime, timedelta, timezone
 from functools import wraps
+from urllib.parse import urlencode
+from urllib.request import urlopen
 
 from dotenv import load_dotenv
 from flask import Flask, render_template, request, redirect, url_for, session, flash
@@ -100,6 +103,99 @@ def logout():
     return redirect(url_for("login"))
 
 
+# ---------- Weather (Open-Meteo API) ----------
+
+def fetch_json(url, params):
+    """Call a web API and return its JSON answer."""
+    with urlopen(url + "?" + urlencode(params), timeout=5) as resp:
+        return json.loads(resp.read().decode("utf-8"))
+
+
+def geocode_city(name):
+    """Turn a city name into coordinates."""
+    data = fetch_json("https://geocoding-api.open-meteo.com/v1/search",
+                      {"name": name, "count": 1, "language": "en", "format": "json"})
+    results = data.get("results")
+    if not results:
+        return None
+    place = results[0]
+    label = place["name"]
+    if place.get("country"):
+        label += ", " + place["country"]
+    return {"city": label, "latitude": place["latitude"], "longitude": place["longitude"]}
+
+
+def get_weather(lat, lon):
+    """Get today's and tomorrow's forecast."""
+    data = fetch_json("https://api.open-meteo.com/v1/forecast", {
+        "latitude": lat,
+        "longitude": lon,
+        "current": "temperature_2m",
+        "daily": "precipitation_sum,temperature_2m_max",
+        "timezone": "auto",
+        "forecast_days": 2,
+    })
+    daily = data["daily"]
+    current = data.get("current") or {}
+    return {
+        "temp_now": round(current.get("temperature_2m") or 0),
+        "max_today": round(daily["temperature_2m_max"][0] or 0),
+        "rain_today": round(daily["precipitation_sum"][0] or 0, 1),
+        "rain_tomorrow": round(daily["precipitation_sum"][1] or 0, 1),
+    }
+
+
+def weather_advice(w):
+    if w["rain_today"] >= 2:
+        return "Rain expected today. Skip watering outdoor plants."
+    if w["rain_tomorrow"] >= 2:
+        return "Rain is forecast tomorrow. Outdoor plants can wait a day."
+    if w["max_today"] >= 35:
+        return "Very hot today. Check the soil and water in the evening."
+    return "Dry day ahead. A good time to water."
+
+
+def weather_context():
+    """Everything the dashboard needs to show the weather card."""
+    rows = (supabase.table("users").select("city,latitude,longitude")
+            .eq("id", session["user_id"]).execute().data)
+    if not rows or rows[0].get("latitude") is None:
+        return {"weather": None, "city": None}
+
+    user = rows[0]
+    try:
+        weather = get_weather(user["latitude"], user["longitude"])
+        weather["advice"] = weather_advice(weather)
+    except Exception as e:
+        print("Weather error:", e)
+        weather = {"error": True}
+    return {"weather": weather, "city": user["city"]}
+
+
+@app.route("/settings/city", methods=["POST"])
+@login_required
+def set_city():
+    name = request.form.get("city", "").strip()
+    if not name:
+        flash("Please enter a city.", "error")
+        return redirect(url_for("dashboard"))
+
+    try:
+        place = geocode_city(name)
+    except Exception as e:
+        print("Geocoding error:", e)
+        flash("Could not reach the weather service. Please try again.", "error")
+        return redirect(url_for("dashboard"))
+
+    if not place:
+        flash("City not found. Try a different spelling.", "error")
+        return redirect(url_for("dashboard"))
+
+    supabase.table("users").update(place).eq("id", session["user_id"]).execute()
+    flash("Weather location set to " + place["city"] + ".", "success")
+    return redirect(url_for("dashboard"))
+
+
 # ---------- Plants (CRUD) ----------
 
 def read_plant_form():
@@ -180,7 +276,7 @@ def dashboard():
             plant["status"] = f"Next watering in {days_left} day{'s' if days_left != 1 else ''}"
             plant["status_class"] = "ok"
 
-    return render_template("dashboard.html", plants=plants)
+    return render_template("dashboard.html", plants=plants, **weather_context())
 
 
 @app.route("/plants/add", methods=["GET", "POST"])

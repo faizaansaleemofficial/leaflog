@@ -7,7 +7,8 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
-  <nav>
+  <header>
+    <nav>
     <a href="{{ url_for('index') }}" class="brand">🌿 LeafLog</a>
     <div>
       {% if session.user_id %}
@@ -19,6 +20,7 @@
       {% endif %}
     </div>
   </nav>
+  </header>
 
   <main>
     {% with messages = get_flashed_messages(with_categories=true) %}
@@ -28,6 +30,8 @@
     {% endwith %}
 
     {% block content %}{% endblock %}
-  </main>
+  </main>      <footer>
+       <p>LeafLog · Full-Stack Engineering capstone project</p>
+     </footer>
 </body>
 </html>

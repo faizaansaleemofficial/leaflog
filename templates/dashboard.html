@@ -10,13 +10,22 @@
 <div class="plant-grid">
   {% for plant in plants %}
   <article class="plant-card">
-    <h2>{{ plant.name }}</h2>
+    <h2><a href="{{ url_for('plant_detail', plant_id=plant.id) }}">{{ plant.name }}</a></h2>
     {% if plant.species %}<p class="species">{{ plant.species }}</p>{% endif %}
     <p>📍 {{ plant.location or "No location set" }}</p>
     <p>💧 Water every {{ plant.watering_interval_days }} days</p>
+    <p>🕒 Last watered: {{ plant.last_watered or "never" }}</p>
+    <p class="status {{ plant.status_class }}">{{ plant.status }}</p>
     {% if plant.notes %}<p class="notes">{{ plant.notes }}</p>{% endif %}
+
     <div class="card-actions">
-      <a href="{{ url_for('edit_plant', plant_id=plant.id) }}" class="btn small">Edit</a>
+      <form method="POST" action="{{ url_for('water_plant', plant_id=plant.id) }}">
+        <button type="submit" class="small">💧 Water now</button>
+      </form>
+      <a href="{{ url_for('plant_detail', plant_id=plant.id) }}" class="btn small secondary">History</a>
+    </div>
+    <div class="card-actions">
+      <a href="{{ url_for('edit_plant', plant_id=plant.id) }}" class="btn small secondary">Edit</a>
       <form method="POST" action="{{ url_for('delete_plant', plant_id=plant.id) }}" class="delete-form">
         <button type="submit" class="small danger">Delete</button>
       </form>
@@ -34,7 +43,7 @@
 <script>
 document.querySelectorAll(".delete-form").forEach(function (form) {
   form.addEventListener("submit", function (e) {
-    if (!confirm("Delete this plant? This cannot be undone.")) {
+    if (!confirm("Delete this plant and its watering history? This cannot be undone.")) {
       e.preventDefault();
     }
   });

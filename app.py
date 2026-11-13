@@ -1,4 +1,6 @@
 import os
+import re
+from datetime import datetime, timedelta, timezone
 from functools import wraps
 
 from dotenv import load_dotenv
@@ -130,6 +132,13 @@ def get_own_plant(plant_id):
     return result.data[0] if result.data else None
 
 
+def parse_ts(value):
+    """Turn a Supabase timestamp string into a datetime."""
+    value = value.replace("Z", "+00:00")
+    value = re.sub(r"\.(\d+)", lambda m: "." + m.group(1).ljust(6, "0")[:6], value)
+    return datetime.fromisoformat(value)
+
+
 @app.route("/dashboard")
 @login_required
 def dashboard():
@@ -137,6 +146,38 @@ def dashboard():
               .eq("user_id", session["user_id"])
               .order("created_at", desc=True)
               .execute().data)
+
+    logs = []
+    if plants:
+        ids = [p["id"] for p in plants]
+        logs = (supabase.table("watering_logs").select("plant_id,watered_at")
+                .in_("plant_id", ids)
+                .order("watered_at", desc=True)
+                .execute().data)
+
+    # Newest log for each plant (logs are already newest-first)
+    last_watered = {}
+    for log in logs:
+        last_watered.setdefault(log["plant_id"], log["watered_at"])
+
+    today = datetime.now(timezone.utc).date()
+    for plant in plants:
+        last = last_watered.get(plant["id"])
+        start = parse_ts(last) if last else parse_ts(plant["created_at"])
+        due = start.date() + timedelta(days=plant["watering_interval_days"])
+        days_left = (due - today).days
+
+        plant["last_watered"] = parse_ts(last).strftime("%d %b %Y") if last else None
+        if days_left < 0:
+            plant["status"] = f"Overdue by {-days_left} day{'s' if days_left != -1 else ''}"
+            plant["status_class"] = "overdue"
+        elif days_left == 0:
+            plant["status"] = "Water today"
+            plant["status_class"] = "due"
+        else:
+            plant["status"] = f"Next watering in {days_left} day{'s' if days_left != 1 else ''}"
+            plant["status_class"] = "ok"
+
     return render_template("dashboard.html", plants=plants)
 
 
@@ -190,6 +231,61 @@ def delete_plant(plant_id):
      .execute())
     flash("Plant deleted.", "success")
     return redirect(url_for("dashboard"))
+
+
+# ---------- Watering logs ----------
+
+@app.route("/plants/<int:plant_id>")
+@login_required
+def plant_detail(plant_id):
+    plant = get_own_plant(plant_id)
+    if not plant:
+        flash("Plant not found.", "error")
+        return redirect(url_for("dashboard"))
+
+    logs = (supabase.table("watering_logs").select("*")
+            .eq("plant_id", plant_id)
+            .order("watered_at", desc=True)
+            .execute().data)
+    for log in logs:
+        log["when"] = parse_ts(log["watered_at"]).strftime("%d %b %Y, %H:%M UTC")
+
+    return render_template("plant_detail.html", plant=plant, logs=logs)
+
+
+@app.route("/plants/<int:plant_id>/water", methods=["POST"])
+@login_required
+def water_plant(plant_id):
+    plant = get_own_plant(plant_id)
+    if not plant:
+        flash("Plant not found.", "error")
+        return redirect(url_for("dashboard"))
+
+    note = request.form.get("note", "").strip() or None
+    supabase.table("watering_logs").insert({
+        "plant_id": plant_id,
+        "note": note,
+        "watered_at": datetime.now(timezone.utc).isoformat(),
+    }).execute()
+    flash(f"Logged watering for {plant['name']}!", "success")
+
+    if request.form.get("from") == "detail":
+        return redirect(url_for("plant_detail", plant_id=plant_id))
+    return redirect(url_for("dashboard"))
+
+
+@app.route("/logs/<int:log_id>/delete", methods=["POST"])
+@login_required
+def delete_log(log_id):
+    rows = supabase.table("watering_logs").select("*").eq("id", log_id).execute().data
+    # Only allow it if the log belongs to one of this user's plants
+    if not rows or not get_own_plant(rows[0]["plant_id"]):
+        flash("Entry not found.", "error")
+        return redirect(url_for("dashboard"))
+
+    supabase.table("watering_logs").delete().eq("id", log_id).execute()
+    flash("Watering entry deleted.", "success")
+    return redirect(url_for("plant_detail", plant_id=rows[0]["plant_id"]))
 
 
 if __name__ == "__main__":

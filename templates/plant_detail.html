@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}{{ plant.name }} · LeafLog{% endblock %}
+{% block content %}
+<p><a href="{{ url_for('dashboard') }}">← Back to my plants</a></p>
+
+<h1>{{ plant.name }}</h1>
+{% if plant.species %}<p class="species">{{ plant.species }}</p>{% endif %}
+<p>📍 {{ plant.location or "No location set" }} · 💧 Every {{ plant.watering_interval_days }} days</p>
+{% if plant.notes %}<p class="notes">{{ plant.notes }}</p>{% endif %}
+
+<form method="POST" action="{{ url_for('water_plant', plant_id=plant.id) }}" class="card">
+  <input type="hidden" name="from" value="detail">
+  <label for="note">Log a watering (optional note)</label>
+  <input type="text" id="note" name="note" maxlength="120"
+         placeholder="e.g. Added fertilizer">
+  <button type="submit">💧 Water now</button>
+</form>
+
+<h2>Watering history ({{ logs|length }})</h2>
+{% if logs %}
+<ul class="log-list">
+  {% for log in logs %}
+  <li>
+    <span>{{ log.when }}{% if log.note %} — {{ log.note }}{% endif %}</span>
+    <form method="POST" action="{{ url_for('delete_log', log_id=log.id) }}" class="delete-log-form">
+      <button type="submit" class="small danger">Delete</button>
+    </form>
+  </li>
+  {% endfor %}
+</ul>
+{% else %}
+<p>No watering logged yet.</p>
+{% endif %}
+
+<script>
+document.querySelectorAll(".delete-log-form").forEach(function (form) {
+  form.addEventListener("submit", function (e) {
+    if (!confirm("Delete this watering entry?")) { e.preventDefault(); }
+  });
+});
+</script>
+{% endblock %}

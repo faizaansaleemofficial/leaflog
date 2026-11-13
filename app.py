@@ -10,7 +10,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 
 load_dotenv()
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder="public", static_url_path="")
 app.secret_key = os.environ["SECRET_KEY"]
 
 supabase = create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_KEY"])
